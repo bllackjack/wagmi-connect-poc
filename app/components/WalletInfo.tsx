@@ -24,10 +24,9 @@ export function WalletInfo() {
   return (
     <div className="p-4">
       <ConnectButton />
-
-      {isConnected && (
-        <>
-          <div className="mt-4 space-y-2">
+      <div className="mt-4 space-y-2">
+        {isConnected && (
+          <>
             <p>
               Connected to: {chainId ? CHAIN_NAMES[chainId] : "Unknown Network"}
             </p>
@@ -36,11 +35,11 @@ export function WalletInfo() {
               Native Token Balance: {nativeBalance} {nativeTokenSymbol}
             </p>
             <p>USDC Balance: {usdcBalance} USDC</p>
-          </div>
 
-          <TokenTransfer />
-        </>
-      )}
+            <TokenTransfer />
+          </>
+        )}
+      </div>
     </div>
   );
 }

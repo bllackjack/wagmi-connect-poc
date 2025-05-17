@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   useBalance,
   useWriteContract,
@@ -9,6 +9,8 @@ import {
 } from "wagmi";
 import { parseEther } from "ethers";
 import { useWallet } from "../hooks/useWallet";
+import { useTokens } from "../hooks/useTokens";
+import { useTokenBalances } from "../hooks/useTokenBalances";
 
 // ERC20 ABI for transfer function
 const ERC20_ABI = [
@@ -26,37 +28,53 @@ const ERC20_ABI = [
 
 export function TokenTransfer() {
   const { address, chainId, nativeTokenSymbol } = useWallet();
+  const { tokens, loading: tokensLoading } = useTokens();
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
-  const [selectedToken, setSelectedToken] = useState<"native" | "usdc">(
+  const [selectedToken, setSelectedToken] = useState<"native" | "erc20">(
     "native"
   );
+  const [selectedERC20, setSelectedERC20] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState("");
 
-  // Get USDC contract address for current chain
-  const USDC_ADDRESSES = {
-    1: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", // Mainnet
-    5: "0x07865c6E87B9F70255377e024ace6630C1Eaa37F", // Goerli
-    11155111: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", // Sepolia
-    100: "0xDDAfbb505ad214D7b80b1f830fcCc89B60fb7A83", // Gnosis
-  } as const;
+  // Get user's native token balance
+  const { data: nativeBalance } = useBalance({
+    address,
+  });
+
+  // Get token balances
+  const tokenBalances = useTokenBalances(tokens, chainId, address);
+
+  // Filter tokens based on search query
+  const filteredTokens = useMemo(() => {
+    return tokens.filter((token) => {
+      const matchesSearch =
+        token.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        token.name.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesSearch;
+    });
+  }, [tokens, searchQuery]);
+
+  // Get selected token's contract address
+  const selectedTokenAddress =
+    selectedToken === "erc20" && selectedERC20
+      ? tokens.find((t) => t.id === selectedERC20)?.platforms[
+          chainId?.toString() || ""
+        ]
+      : undefined;
 
   // Get user's balance for selected token
   const { data: balance } = useBalance({
     address,
-    token:
-      selectedToken === "usdc"
-        ? (USDC_ADDRESSES[
-            chainId as keyof typeof USDC_ADDRESSES
-          ] as `0x${string}`)
-        : undefined,
+    token: selectedTokenAddress as `0x${string}` | undefined,
   });
 
-  // Setup contract write for USDC transfers
+  // Setup contract write for ERC20 transfers
   const {
-    data: usdcHash,
-    writeContract: transferUSDC,
-    isPending: isUSDCTransferPending,
+    data: erc20Hash,
+    writeContract: transferERC20,
+    isPending: isERC20TransferPending,
   } = useWriteContract();
 
   // Setup native token transfer
@@ -67,9 +85,9 @@ export function TokenTransfer() {
   } = useSendTransaction();
 
   // Wait for transaction receipts
-  const { isLoading: isUSDCConfirming, isSuccess: isUSDCSuccess } =
+  const { isLoading: isERC20Confirming, isSuccess: isERC20Success } =
     useWaitForTransactionReceipt({
-      hash: usdcHash,
+      hash: erc20Hash,
     });
 
   const { isLoading: isNativeConfirming, isSuccess: isNativeSuccess } =
@@ -92,12 +110,10 @@ export function TokenTransfer() {
     }
 
     try {
-      if (selectedToken === "usdc") {
-        // USDC transfer
-        transferUSDC({
-          address: USDC_ADDRESSES[
-            chainId as keyof typeof USDC_ADDRESSES
-          ] as `0x${string}`,
+      if (selectedToken === "erc20" && selectedTokenAddress) {
+        // ERC20 transfer
+        transferERC20({
+          address: selectedTokenAddress as `0x${string}`,
           abi: ERC20_ABI,
           functionName: "transfer",
           args: [recipient as `0x${string}`, parseEther(amount)],
@@ -114,10 +130,10 @@ export function TokenTransfer() {
     }
   };
 
-  const isPending = isUSDCTransferPending || isNativeTransferPending;
-  const isConfirming = isUSDCConfirming || isNativeConfirming;
-  const isSuccess = isUSDCSuccess || isNativeSuccess;
-  const hash = usdcHash || nativeHash;
+  const isPending = isERC20TransferPending || isNativeTransferPending;
+  const isConfirming = isERC20Confirming || isNativeConfirming;
+  const isSuccess = isERC20Success || isNativeSuccess;
+  const hash = erc20Hash || nativeHash;
 
   return (
     <div className="mt-8 p-8 bg-white/10 backdrop-blur-lg rounded-xl shadow-xl border border-white/20">
@@ -131,17 +147,85 @@ export function TokenTransfer() {
           <select
             value={selectedToken}
             onChange={(e) =>
-              setSelectedToken(e.target.value as "native" | "usdc")
+              setSelectedToken(e.target.value as "native" | "erc20")
             }
             className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
           >
             <option value="native" className="bg-gray-900">
-              {nativeTokenSymbol}
+              {nativeTokenSymbol}{" "}
+              {nativeBalance && `(${nativeBalance.formatted})`}
             </option>
-            <option value="usdc" className="bg-gray-900">
-              USDC
+            <option value="erc20" className="bg-gray-900">
+              ERC20 Token
             </option>
           </select>
+
+          {selectedToken === "erc20" && (
+            <div className="mt-4">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search tokens..."
+                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              />
+
+              {tokensLoading ? (
+                <div className="mt-2 text-gray-400">Loading tokens...</div>
+              ) : filteredTokens.length === 0 ? (
+                <div className="mt-2 text-gray-400">
+                  No tokens found matching your search.
+                </div>
+              ) : (
+                <div className="mt-2 max-h-48 overflow-y-auto">
+                  {filteredTokens.map((token) => {
+                    const tokenBalance = tokenBalances.find(
+                      (tb) => tb.token.id === token.id
+                    )?.balance;
+                    const hasBalance =
+                      tokenBalance && Number(tokenBalance.value) > 0;
+                    const isSelected = selectedERC20 === token.id;
+
+                    return (
+                      <button
+                        key={token.id}
+                        type="button"
+                        onClick={() => hasBalance && setSelectedERC20(token.id)}
+                        className={`w-full text-left px-4 py-2 rounded-lg transition-all ${
+                          isSelected
+                            ? "bg-blue-500/20 text-white"
+                            : hasBalance
+                            ? "text-gray-300 hover:bg-white/5"
+                            : "text-gray-500 cursor-not-allowed opacity-50"
+                        }`}
+                      >
+                        <div className="font-medium flex items-center justify-between">
+                          <span>{token.symbol}</span>
+                          {!hasBalance && (
+                            <span className="text-xs bg-gray-700/50 px-2 py-1 rounded">
+                              Not owned
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-400">
+                          {token.name}
+                        </div>
+                        {tokenBalance && (
+                          <div
+                            className={`text-sm ${
+                              hasBalance ? "text-green-400" : "text-gray-500"
+                            }`}
+                          >
+                            Balance: {tokenBalance.formatted}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div>
@@ -185,7 +269,11 @@ export function TokenTransfer() {
 
         <button
           type="submit"
-          disabled={isPending || isConfirming}
+          disabled={
+            isPending ||
+            isConfirming ||
+            (selectedToken === "erc20" && !selectedERC20)
+          }
           className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         >
           {isPending

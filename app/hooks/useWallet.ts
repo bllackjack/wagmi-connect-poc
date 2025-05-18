@@ -50,8 +50,8 @@ export function useWallet() {
     address,
   });
 
-  // Fetch USDC balance
-  const { data: usdcBalance } = useBalance({
+  // Fetch USDC balance directly using wagmi
+  const { data: directUsdcBalance } = useBalance({
     address,
     token: chainId
       ? (TOKEN_ADDRESSES.USDC[
@@ -82,16 +82,47 @@ export function useWallet() {
           `https://tokens.1inch.io/v1.2/${chainId}/tokens.json`
         );
         const data = await response.json();
-        const tokens: TokenInfo[] = Object.values(data.tokens);
+        const baseTokens: TokenInfo[] = data.tokens
+          ? Object.values(data.tokens)
+          : [];
+
+        // Ensure USDC is in the list
+        const usdcAddress =
+          TOKEN_ADDRESSES.USDC[chainId as keyof typeof TOKEN_ADDRESSES.USDC];
+
+        const tokens =
+          usdcAddress &&
+          !baseTokens.some(
+            (t) => t.address.toLowerCase() === usdcAddress.toLowerCase()
+          )
+            ? [
+                ...baseTokens,
+                {
+                  address: usdcAddress,
+                  symbol: "USDC",
+                  name: "USD Coin",
+                  decimals: 6,
+                },
+              ]
+            : baseTokens;
 
         // Fetch balances for all tokens
         const balances = await Promise.all(
           tokens.map(async (token) => {
             try {
+              // For USDC, use the direct balance if available
+              if (token.symbol === "USDC" && directUsdcBalance) {
+                return {
+                  ...token,
+                  balance: formatEther(directUsdcBalance.value),
+                };
+              }
+
               const response = await fetch(
                 `https://api.1inch.io/v5.0/${chainId}/balance?tokenAddress=${token.address}&walletAddress=${address}`
               );
               const data = await response.json();
+              console.log("Balance response for", token.symbol, ":", data);
               const balance = BigInt(data.balance);
 
               if (balance > BigInt(0)) {
@@ -112,9 +143,10 @@ export function useWallet() {
         );
 
         // Filter out null balances and update state
-        setAllTokenBalances(
-          balances.filter((b): b is TokenBalance => b !== null)
+        const validBalances = balances.filter(
+          (b): b is TokenBalance => b !== null
         );
+        setAllTokenBalances(validBalances);
       } catch (error) {
         console.error("Error fetching token balances:", error);
       } finally {
@@ -125,7 +157,7 @@ export function useWallet() {
     if (isConnected) {
       fetchAllTokenBalances();
     }
-  }, [address, chainId, isConnected]);
+  }, [address, chainId, isConnected, directUsdcBalance]);
 
   return {
     address,
@@ -135,7 +167,7 @@ export function useWallet() {
       ? NATIVE_TOKENS[chainId as keyof typeof NATIVE_TOKENS]
       : "Unknown",
     nativeBalance: nativeBalance ? formatEther(nativeBalance.value) : "0",
-    usdcBalance: usdcBalance ? formatEther(usdcBalance.value) : "0",
+    usdcBalance: directUsdcBalance ? formatEther(directUsdcBalance.value) : "0",
     stethBalance: stethBalance ? formatEther(stethBalance.value) : "0",
     allTokenBalances,
     isLoadingTokens,

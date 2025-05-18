@@ -12,6 +12,7 @@ import { useWallet } from "../hooks/useWallet";
 import { useTokens } from "../hooks/useTokens";
 import { useTokenBalances } from "../hooks/useTokenBalances";
 import { TOKEN_ADDRESSES } from "../hooks/useWallet";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
 
 // ERC20 ABI for transfer function
 const ERC20_ABI = [
@@ -34,6 +35,7 @@ export function TokenTransfer() {
     nativeTokenSymbol,
     allTokenBalances,
     isLoadingTokens,
+    isConnected,
   } = useWallet();
   const { tokens, loading: tokensLoading } = useTokens();
   const [recipient, setRecipient] = useState("");
@@ -250,279 +252,329 @@ export function TokenTransfer() {
   const isSuccess = isERC20Success || isNativeSuccess;
   const hash = erc20Hash || nativeHash;
 
-  return (
-    <div className="mt-8 p-8 bg-white/10 backdrop-blur-lg rounded-xl shadow-xl border border-white/20">
-      <h2 className="text-2xl font-bold mb-6 text-white">Transfer Tokens</h2>
-
-      {/* Your Tokens Section */}
-      <div className="mb-8">
-        <h3 className="text-lg font-semibold text-white mb-4">Your Tokens</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Native Token */}
-          {nativeBalance && Number(nativeBalance.value) > 0 && (
-            <div className="p-4 bg-white/5 rounded-lg border border-white/10">
-              <div className="font-medium text-white">{nativeTokenSymbol}</div>
-              <div className="text-sm text-gray-400">Native Token</div>
-              <div className="text-green-400 mt-2">
-                Balance: {nativeBalance.formatted}
-              </div>
-            </div>
-          )}
-
-          {/* stETH */}
-          {stethBalance && Number(stethBalance.value) > 0 && (
-            <div className="p-4 rounded-lg border border-white/10 bg-purple-500/10">
-              <div className="font-medium text-white">stETH</div>
-              <div className="text-sm text-gray-400">Staked ETH</div>
-              <div className="text-green-400 mt-2">
-                Balance: {stethBalance.formatted}
-              </div>
-            </div>
-          )}
-
-          {/* USDC */}
-          {usdcBalance && Number(usdcBalance.value) > 0 && (
-            <div className="p-4 rounded-lg border border-white/10 bg-blue-500/10">
-              <div className="font-medium text-white">USDC</div>
-              <div className="text-sm text-gray-400">USD Coin</div>
-              <div className="text-green-400 mt-2">
-                Balance: {usdcBalance.formatted}
-              </div>
-            </div>
-          )}
-
-          {/* Other ERC20 Tokens */}
-          {ownedTokens.map(({ token, balance }) => (
-            <div
-              key={token.id}
-              className="p-4 bg-white/5 rounded-lg border border-white/10"
-            >
-              <div className="font-medium text-white">{token.symbol}</div>
-              <div className="text-sm text-gray-400">{token.name}</div>
-              {balance && (
-                <div className="text-green-400 mt-2">
-                  Balance: {balance.formatted}
-                </div>
-              )}
-            </div>
-          ))}
-
-          {/* All detected ERC20 tokens */}
-          {isLoadingTokens ? (
-            <div className="col-span-full text-center text-gray-400 py-4">
-              Loading tokens...
-            </div>
-          ) : allTokenBalances.length > 0 ? (
-            allTokenBalances.map((token) => (
-              <div
-                key={token.address}
-                className="p-4 bg-white/5 rounded-lg border border-white/10"
+  if (!isConnected) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-white mb-8">
+            Welcome to Token Transfer
+          </h1>
+          <ConnectButton.Custom>
+            {({ openConnectModal }) => (
+              <button
+                onClick={openConnectModal}
+                className="px-12 py-6 bg-blue-900 hover:bg-blue-800 text-white text-2xl font-medium rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 transition-all transform hover:scale-105 shadow-lg"
               >
-                <div className="font-medium text-white">{token.symbol}</div>
-                <div className="text-sm text-gray-400">{token.name}</div>
-                <div className="text-green-400 mt-2">
-                  Balance: {token.balance}
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="col-span-full text-center text-gray-400 py-4">
-              No tokens found in your wallet
-            </div>
-          )}
+                Connect Wallet
+              </button>
+            )}
+          </ConnectButton.Custom>
         </div>
       </div>
+    );
+  }
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <label className="block text-sm font-medium text-white mb-2">
-            Select Token
-          </label>
-          <select
-            value={selectedToken}
-            onChange={(e) => {
-              const newValue = e.target.value as "native" | "erc20";
-              setSelectedToken(newValue);
-              // Reset selectedERC20 when switching to native token
-              if (newValue === "native") {
-                setSelectedERC20("");
-              }
-            }}
-            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-          >
-            <option value="native" className="bg-gray-900">
-              {nativeTokenSymbol}{" "}
-              {nativeBalance && `(${nativeBalance.formatted})`}
-            </option>
-            {stethBalance && Number(stethBalance.value) > 0 && (
-              <option value="erc20" className="bg-gray-900">
-                stETH ({stethBalance.formatted})
-              </option>
-            )}
-            {usdcBalance && Number(usdcBalance.value) > 0 && (
-              <option value="erc20" className="bg-gray-900">
-                USDC ({usdcBalance.formatted})
-              </option>
-            )}
-            <option value="erc20" className="bg-gray-900">
-              Other ERC20 Token
-            </option>
-            {allTokenBalances.map((token) => (
-              <option
-                key={token.address}
-                value="erc20"
-                className="bg-gray-900"
-                onClick={() => setSelectedERC20(token.address)}
-              >
-                {token.symbol} ({token.balance})
-              </option>
-            ))}
-          </select>
+  console.log({ allTokenBalances });
 
-          {selectedToken === "erc20" && (
-            <div className="mt-4">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search tokens..."
-                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-              />
+  return (
+    <div className="bg-gray-900 p-8 mt-5">
+      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Left Section - Wallet Info & Tokens */}
+        <div className="bg-gray-800 rounded-2xl shadow-xl border border-gray-700 p-6">
+          <h2 className="text-2xl font-bold mb-6 text-white">Your Wallet</h2>
 
-              {tokensLoading ? (
-                <div className="mt-2 text-gray-400">Loading tokens...</div>
-              ) : filteredTokens.length === 0 ? (
-                <div className="mt-2 text-gray-400">
-                  No tokens found matching your search.
+          {/* Connection Status */}
+          <div className="mb-8 p-4 bg-gray-700/50 rounded-xl">
+            <div className="text-sm text-gray-400 mb-2">Connected Account</div>
+            <div className="font-mono text-white break-all">{address}</div>
+            <div className="mt-2 text-sm text-gray-400">
+              Network: {chainId} ({nativeTokenSymbol})
+            </div>
+          </div>
+
+          {/* Tokens Section */}
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-4">
+              Your Tokens
+            </h3>
+            <div className="space-y-4">
+              {/* Native Token */}
+              {nativeBalance && Number(nativeBalance.value) > 0 && (
+                <div className="p-4 bg-gray-700/50 rounded-xl border border-gray-600">
+                  <div className="font-medium text-white">
+                    {nativeTokenSymbol}
+                  </div>
+                  <div className="text-sm text-gray-400">Native Token</div>
+                  <div className="text-green-400 mt-2">
+                    Balance: {nativeBalance.formatted}
+                  </div>
                 </div>
-              ) : (
-                <div className="mt-2 max-h-48 overflow-y-auto">
-                  {filteredTokens.map((token) => {
-                    const tokenBalance = allTokenBalances.find(
-                      (tb) =>
-                        tb.address ===
-                        token.platforms[chainId?.toString() || ""]
-                    );
-                    const hasBalance =
-                      tokenBalance && Number(tokenBalance.balance) > 0;
-                    const isSelected =
-                      selectedERC20 ===
-                      token.platforms[chainId?.toString() || ""];
+              )}
 
-                    return (
-                      <button
-                        key={token.id}
-                        type="button"
-                        onClick={() =>
-                          hasBalance &&
-                          setSelectedERC20(
-                            token.platforms[chainId?.toString() || ""]
-                          )
-                        }
-                        className={`w-full text-left px-4 py-2 rounded-lg transition-all ${
-                          isSelected
-                            ? "bg-blue-500/20 text-white"
-                            : hasBalance
-                            ? "text-gray-300 hover:bg-white/5"
-                            : "text-gray-500 cursor-not-allowed opacity-50"
-                        }`}
-                      >
-                        <div className="font-medium flex items-center justify-between">
-                          <span>{token.symbol}</span>
-                          {!hasBalance && (
-                            <span className="text-xs bg-gray-700/50 px-2 py-1 rounded">
-                              Not owned
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-sm text-gray-400">
-                          {token.name}
-                        </div>
-                        {tokenBalance && (
-                          <div
-                            className={`text-sm ${
-                              hasBalance ? "text-green-400" : "text-gray-500"
-                            }`}
-                          >
-                            Balance: {tokenBalance.balance}
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
+              {/* stETH */}
+              {/* {stethBalance && Number(stethBalance.value) > 0 && (
+                <div className="p-4 rounded-lg border border-white/10 bg-purple-500/10">
+                  <div className="font-medium text-white">stETH</div>
+                  <div className="text-sm text-gray-400">Staked ETH</div>
+                  <div className="text-green-400 mt-2">
+                    Balance: {stethBalance.formatted}
+                  </div>
+                </div>
+              )} */}
+
+              {/* USDC */}
+              {/* {usdcBalance && Number(usdcBalance.value) > 0 && (
+                <div className="p-4 rounded-lg border border-white/10 bg-blue-500/10">
+                  <div className="font-medium text-white">USDC</div>
+                  <div className="text-sm text-gray-400">USD Coin</div>
+                  <div className="text-green-400 mt-2">
+                    Balance: {usdcBalance.formatted}
+                  </div>
+                </div>
+              )} */}
+
+              {/* Other ERC20 Tokens */}
+              {ownedTokens.map(({ token, balance }) => (
+                <div
+                  key={token.id}
+                  className="p-4 bg-white/5 rounded-lg border border-white/10"
+                >
+                  <div className="font-medium text-white">{token.symbol}</div>
+                  <div className="text-sm text-gray-400">{token.name}</div>
+                  {balance && (
+                    <div className="text-green-400 mt-2">
+                      Balance: {balance.formatted}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {/* All detected ERC20 tokens */}
+              {isLoadingTokens ? (
+                <div className="text-center text-gray-400 py-4">
+                  Loading tokens...
+                </div>
+              ) : allTokenBalances.length > 0 ? (
+                allTokenBalances.map((token) => (
+                  <div
+                    key={token.address}
+                    className="p-4 bg-gray-700/50 rounded-xl border border-gray-600"
+                  >
+                    <div className="font-medium text-white">{token.symbol}</div>
+                    <div className="text-sm text-gray-400">{token.name}</div>
+                    <div className="text-green-400 mt-2">
+                      Balance: {token.balance}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center text-gray-400 py-4">
+                  No tokens found in your wallet
                 </div>
               )}
             </div>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-white mb-2">
-            Recipient Address
-          </label>
-          <input
-            type="text"
-            value={recipient}
-            onChange={(e) => setRecipient(e.target.value)}
-            placeholder="0x..."
-            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-white mb-2">
-            Amount
-          </label>
-          <input
-            type="number"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            step="any"
-            min="0"
-            placeholder="0.0"
-            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-          />
-          {balance && (
-            <p className="mt-2 text-sm text-gray-300">
-              Balance: {balance.formatted} {balance.symbol}
-            </p>
-          )}
-        </div>
-
-        {error && (
-          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
-            <div className="font-medium mb-1">Error</div>
-            <div>{error}</div>
           </div>
-        )}
+        </div>
 
-        <button
-          type="submit"
-          disabled={
-            isPending ||
-            isConfirming ||
-            isEstimatingGas ||
-            (selectedToken === "erc20" && !selectedTokenAddress)
-          }
-          className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-        >
-          {isEstimatingGas
-            ? "Estimating Gas..."
-            : isPending
-            ? "Confirming..."
-            : isConfirming
-            ? "Processing..."
-            : "Transfer"}
-        </button>
+        {/* Right Section - Transfer Form */}
+        <div className="bg-gray-800 rounded-2xl shadow-xl border border-gray-700 p-6">
+          <h2 className="text-2xl font-bold mb-6 text-white">
+            Transfer Tokens
+          </h2>
 
-        {isSuccess && (
-          <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-green-400 text-sm">
-            <div className="font-medium mb-1">Success!</div>
-            <div>Transaction successful!</div>
-            <div className="mt-1 text-xs break-all">Hash: {hash}</div>
-          </div>
-        )}
-      </form>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-white mb-2">
+                Select Token
+              </label>
+              <select
+                value={selectedToken}
+                onChange={(e) => {
+                  const newValue = e.target.value as "native" | "erc20";
+                  setSelectedToken(newValue);
+                  if (newValue === "native") {
+                    setSelectedERC20("");
+                  }
+                }}
+                className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              >
+                <option value="native" className="bg-gray-800">
+                  {nativeTokenSymbol}{" "}
+                  {nativeBalance && `(${nativeBalance.formatted})`}
+                </option>
+                {stethBalance && Number(stethBalance.value) > 0 && (
+                  <option value="erc20" className="bg-gray-800">
+                    stETH ({stethBalance.formatted})
+                  </option>
+                )}
+                {usdcBalance && Number(usdcBalance.value) > 0 && (
+                  <option value="erc20" className="bg-gray-800">
+                    USDC ({usdcBalance.formatted})
+                  </option>
+                )}
+                <option value="erc20" className="bg-gray-800">
+                  Other ERC20 Token
+                </option>
+                {allTokenBalances.map((token) => (
+                  <option
+                    key={token.address}
+                    value="erc20"
+                    className="bg-gray-800"
+                    onClick={() => setSelectedERC20(token.address)}
+                  >
+                    {token.symbol} ({token.balance})
+                  </option>
+                ))}
+              </select>
+
+              {selectedToken === "erc20" && (
+                <div className="mt-4">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search tokens..."
+                    className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  />
+
+                  {tokensLoading ? (
+                    <div className="mt-2 text-gray-400">Loading tokens...</div>
+                  ) : filteredTokens.length === 0 ? (
+                    <div className="mt-2 text-gray-400">
+                      No tokens found matching your search.
+                    </div>
+                  ) : (
+                    <div className="mt-2 max-h-48 overflow-y-auto">
+                      {filteredTokens.map((token) => {
+                        const tokenBalance = allTokenBalances.find(
+                          (tb) =>
+                            tb.address ===
+                            token.platforms[chainId?.toString() || ""]
+                        );
+                        const hasBalance =
+                          tokenBalance && Number(tokenBalance.balance) > 0;
+                        const isSelected =
+                          selectedERC20 ===
+                          token.platforms[chainId?.toString() || ""];
+
+                        return (
+                          <button
+                            key={token.id}
+                            type="button"
+                            onClick={() =>
+                              hasBalance &&
+                              setSelectedERC20(
+                                token.platforms[chainId?.toString() || ""]
+                              )
+                            }
+                            className={`w-full text-left px-4 py-2 rounded-xl transition-all ${
+                              isSelected
+                                ? "bg-blue-900/50 text-white"
+                                : hasBalance
+                                ? "text-gray-300 hover:bg-gray-700/50"
+                                : "text-gray-500 cursor-not-allowed opacity-50"
+                            }`}
+                          >
+                            <div className="font-medium flex items-center justify-between">
+                              <span>{token.symbol}</span>
+                              {!hasBalance && (
+                                <span className="text-xs bg-gray-700 px-2 py-1 rounded">
+                                  Not owned
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-sm text-gray-400">
+                              {token.name}
+                            </div>
+                            {tokenBalance && (
+                              <div
+                                className={`text-sm ${
+                                  hasBalance
+                                    ? "text-green-400"
+                                    : "text-gray-500"
+                                }`}
+                              >
+                                Balance: {tokenBalance.balance}
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-white mb-2">
+                Recipient Address
+              </label>
+              <input
+                type="text"
+                value={recipient}
+                onChange={(e) => setRecipient(e.target.value)}
+                placeholder="0x..."
+                className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-white mb-2">
+                Amount
+              </label>
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                step="any"
+                min="0"
+                placeholder="0.0"
+                className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              />
+              {balance && (
+                <p className="mt-2 text-sm text-gray-300">
+                  Balance: {balance.formatted} {balance.symbol}
+                </p>
+              )}
+            </div>
+
+            {error && (
+              <div className="p-4 bg-red-900/20 border border-red-500/20 rounded-xl text-red-400 text-sm">
+                <div className="font-medium mb-1">Error</div>
+                <div>{error}</div>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={
+                isPending ||
+                isConfirming ||
+                isEstimatingGas ||
+                (selectedToken === "erc20" && !selectedTokenAddress)
+              }
+              className="w-full py-4 px-4 bg-blue-900 hover:bg-blue-800 text-white font-medium rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
+              {isEstimatingGas
+                ? "Estimating Gas..."
+                : isPending
+                ? "Confirming..."
+                : isConfirming
+                ? "Processing..."
+                : "Transfer"}
+            </button>
+
+            {isSuccess && (
+              <div className="p-4 bg-green-900/20 border border-green-500/20 rounded-xl text-green-400 text-sm">
+                <div className="font-medium mb-1">Success!</div>
+                <div>Transaction successful!</div>
+                <div className="mt-1 text-xs break-all">Hash: {hash}</div>
+              </div>
+            )}
+          </form>
+        </div>
+      </div>
     </div>
   );
 }

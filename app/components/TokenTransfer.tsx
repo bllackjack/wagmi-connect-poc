@@ -11,8 +11,8 @@ import { parseEther } from "ethers";
 import { useWallet } from "../hooks/useWallet";
 import { useTokens } from "../hooks/useTokens";
 import { useTokenBalances } from "../hooks/useTokenBalances";
-import { TOKEN_ADDRESSES } from "../hooks/useWallet";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { TOKEN_ADDRESSES } from "../constants/TokenAddresses";
 
 // ERC20 ABI for transfer function
 const ERC20_ABI = [
@@ -273,8 +273,6 @@ export function TokenTransfer() {
       </div>
     );
   }
-
-  console.log({ allTokenBalances });
 
   return (
     <div className="bg-gray-900 p-8 mt-5">

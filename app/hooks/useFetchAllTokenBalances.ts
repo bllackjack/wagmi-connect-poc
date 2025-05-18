@@ -1,6 +1,6 @@
 import { useAccount, useBalance } from "wagmi";
 import { useChainId } from "wagmi";
-import { formatEther } from "ethers";
+import { formatEther, formatUnits } from "ethers";
 import { useState, useEffect } from "react";
 import { TOKEN_ADDRESSES } from "../constants/TokenAddresses";
 
@@ -11,7 +11,7 @@ interface TokenInfo {
   decimals: number;
 }
 
-interface TokenBalance extends TokenInfo {
+export interface TokenBalance extends TokenInfo {
   balance: string;
 }
 
@@ -32,6 +32,16 @@ export const useFetchAllTokenBalances = () => {
       : undefined,
   });
 
+  // Fetch stETH balance directly using wagmi
+  const { data: directStethBalance } = useBalance({
+    address,
+    token: chainId
+      ? (TOKEN_ADDRESSES.STETH[
+          chainId as keyof typeof TOKEN_ADDRESSES.STETH
+        ] as `0x${string}`)
+      : undefined,
+  });
+
   // Fetch all token balances
   useEffect(() => {
     const fetchAllTokenBalances = async () => {
@@ -48,25 +58,43 @@ export const useFetchAllTokenBalances = () => {
           ? Object.values(data.tokens)
           : [];
 
-        // Ensure USDC is in the list
+        // Ensure USDC and stETH are in the list
         const usdcAddress =
           TOKEN_ADDRESSES.USDC[chainId as keyof typeof TOKEN_ADDRESSES.USDC];
+        const stethAddress =
+          TOKEN_ADDRESSES.STETH[chainId as keyof typeof TOKEN_ADDRESSES.STETH];
 
-        const tokens =
+        const tokens = [...baseTokens];
+
+        // Add USDC if not already in the list
+        if (
           usdcAddress &&
-          !baseTokens.some(
+          !tokens.some(
             (t) => t.address.toLowerCase() === usdcAddress.toLowerCase()
           )
-            ? [
-                ...baseTokens,
-                {
-                  address: usdcAddress,
-                  symbol: "USDC",
-                  name: "USD Coin",
-                  decimals: 6,
-                },
-              ]
-            : baseTokens;
+        ) {
+          tokens.push({
+            address: usdcAddress,
+            symbol: "USDC",
+            name: "USD Coin",
+            decimals: 6,
+          });
+        }
+
+        // Add stETH if not already in the list
+        if (
+          stethAddress &&
+          !tokens.some(
+            (t) => t.address.toLowerCase() === stethAddress.toLowerCase()
+          )
+        ) {
+          tokens.push({
+            address: stethAddress,
+            symbol: "stETH",
+            name: "Staked ETH",
+            decimals: 18,
+          });
+        }
 
         // Fetch balances for all tokens
         const balances = await Promise.all(
@@ -76,7 +104,18 @@ export const useFetchAllTokenBalances = () => {
               if (token.symbol === "USDC" && directUsdcBalance) {
                 return {
                   ...token,
-                  balance: formatEther(directUsdcBalance.value),
+                  balance: formatUnits(
+                    directUsdcBalance.value,
+                    directUsdcBalance.decimals
+                  ),
+                };
+              }
+
+              //   For stETH, use the direct balance if available
+              if (token.symbol === "stETH" && directStethBalance) {
+                return {
+                  ...token,
+                  balance: formatEther(directStethBalance.value),
                 };
               }
 
@@ -118,11 +157,12 @@ export const useFetchAllTokenBalances = () => {
     if (isConnected) {
       fetchAllTokenBalances();
     }
-  }, [address, chainId, isConnected, directUsdcBalance]);
+  }, [address, chainId, isConnected, directUsdcBalance, directStethBalance]);
 
   return {
     allTokenBalances,
     isLoadingTokens,
     directUsdcBalance,
+    directStethBalance,
   };
 };
